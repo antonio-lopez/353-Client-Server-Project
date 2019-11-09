@@ -1,0 +1,3 @@
+Explain the strengths and weaknesses of using symmetric encryption, like AES, versus a public-key cryptosystem, like RSA. 
+Solution Symmetric algorithms, like AES, are fast to perform encryption and decryption, but they have a setup challenge in that Alice and Bob have to figure out some way to share the secret key. 
+In a public-key cryptosystem, there is no problem in setting up any secret key, but the encryption and decryption algorithms are slower.
