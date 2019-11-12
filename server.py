@@ -1,141 +1,223 @@
 import socket
-import select
+from Crypto.PublicKey import RSA
+from Crypto import Random
+from Crypto.Cipher import PKCS1_OAEP
+import ast
 
-HEADER_LENGTH = 10
+#Generate private and public keys
+random_generator = Random.new().read
+private_key = RSA.generate(1024, random_generator)
+public_key = private_key.publickey()
 
-#IP = "127.0.0.1"
-IP = "10.67.13.75"
-PORT = 1234
+#encryptor = PKCS1_OAEP.new(public_key)
+#encrypted = encryptor.encrypt(b'encrypt this message')
 
-# Create a socket
-# socket.AF_INET - address family, IPv4, some otehr possible are AF_INET6, AF_BLUETOOTH, AF_UNIX
-# socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#Declartion
+mysocket = socket.socket()
+host = socket.gethostbyname(socket.getfqdn())
+port = 7777
+encrypt_str = "encrypted_message="
 
-# SO_ - socket option
-# SOL_ - socket option level
-# Sets REUSEADDR (as a socket option) to 1 on socket
-server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+# if host == "127.0.1.1":
+#     import commands
+#     host = commands.getoutput("hostname -I")
+print("host = " + host)
 
-# Bind, so server informs operating system that it's going to use given IP and port
-# For a server using 0.0.0.0 means to listen on all available interfaces, useful to connect locally to 127.0.0.1 and remotely to LAN interface IP
-server_socket.bind((IP, PORT))
+#Prevent socket.error: [Errno 98] Address already in use
+mysocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-# This makes server listen to new connections
-server_socket.listen()
+mysocket.bind((host, port))
 
-# List of sockets for select.select()
-sockets_list = [server_socket]
+mysocket.listen(5)
 
-# List of connected clients - socket as a key, user header and name as data
-clients = {}
-
-print(f'Listening for connections on {IP}:{PORT}...')
-
-# Handles message receiving
-def receive_message(client_socket):
-
-    try:
-
-        # Receive our "header" containing message length, it's size is defined and constant
-        message_header = client_socket.recv(HEADER_LENGTH)
-
-        # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-        if not len(message_header):
-            return False
-
-        # Convert header to int value
-        message_length = int(message_header.decode('utf-8').strip())
-
-        # Return an object of message header and message data
-        return {'header': message_header, 'data': client_socket.recv(message_length)}
-
-    except:
-
-        # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
-        # or just lost his connection
-        # socket.close() also invokes socket.shutdown(socket.SHUT_RDWR) what sends information about closing the socket (shutdown read/write)
-        # and that's also a cause when we receive an empty message
-        return False
+c, addr = mysocket.accept()
 
 while True:
+    #Wait until data is received.
+    data = c.recv(1024)
+    print("From Client: ", data)
+    data = data.replace("\r\n".encode(), ''.encode()) #remove new line character
+    print("New From Client: ", data)
 
-    # Calls Unix select() system call or Windows select() WinSock call with three parameters:
-    #   - rlist - sockets to be monitored for incoming data
-    #   - wlist - sockets for data to be send to (checks if for example buffers are not full and socket is ready to send some data)
-    #   - xlist - sockets to be monitored for exceptions (we want to monitor all sockets for errors, so we can use rlist)
-    # Returns lists:
-    #   - reading - sockets we received some data on (that way we don't have to check sockets manually)
-    #   - writing - sockets ready for data to be send thru them
-    #   - errors  - sockets with some exceptions
-    # This is a blocking call, code execution will "wait" here and "get" notified in case any action should be taken
-    read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
+    client_response = "OK".encode()
+    #if data == "OK":
+    if data == client_response:
+        # c.send("public_key=" + public_key.exportKey() + "\n")
+        #c.send(encryptor)
+        c.send(public_key.exportKey())
+        print("Public key sent to client.")
+        print(public_key.exportKey())
+        #print(encryptor)
+
+    # elif encrypt_str.encode() in data: #Reveive encrypted message and decrypt it.
+    elif encrypt_str.encode() in data: #Reveive encrypted message and decrypt it.    
+        data = data.replace(encrypt_str.encode(), ''.encode())
+        print("Received Encrypted message = ", data)
+        
+        decryptor = PKCS1_OAEP.new(private_key)
+        decrypted = decryptor.decrypt(ast.literal_eval(str(data)))
+        
+        # encrypted = eval(data)
+        # decrypted = private_key.decrypt(encrypted)
+        c.send("Server: OK".encode())
+        print("Decrypted message = ", decrypted)
+
+    elif data == "Quit".encode(): break
+
+#Server to stop
+c.send("Server stopped".encode())
+print("Server stopped")
+c.close()
 
 
-    # Iterate over notified sockets
-    for notified_socket in read_sockets:
+# import socket
+# import select
+# from Crypto.PublicKey import RSA
+# from Crypto import Random
 
-        # If notified socket is a server socket - new connection, accept it
-        if notified_socket == server_socket:
+# HEADER_LENGTH = 10
 
-            # Accept new connection
-            # That gives us new socket - client socket, connected to this given client only, it's unique for that client
-            # The other returned object is ip/port set
-            client_socket, client_address = server_socket.accept()
+# #Generate private and public keys
+# random_generator = Random.new().read
+# private_key = RSA.generate(1024, random_generator)
+# public_key = private_key.publickey()
 
-            # Client should send his name right away, receive it
-            user = receive_message(client_socket)
+# #IP = "127.0.0.1"
+# IP = "10.67.13.75"
+# PORT = 1234
 
-            # If False - client disconnected before he sent his name
-            if user is False:
-                continue
+# # Create a socket
+# # socket.AF_INET - address family, IPv4, some otehr possible are AF_INET6, AF_BLUETOOTH, AF_UNIX
+# # socket.SOCK_STREAM - TCP, conection-based, socket.SOCK_DGRAM - UDP, connectionless, datagrams, socket.SOCK_RAW - raw IP packets
+# server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-            # Add accepted socket to select.select() list
-            sockets_list.append(client_socket)
+# # SO_ - socket option
+# # SOL_ - socket option level
+# # Sets REUSEADDR (as a socket option) to 1 on socket
+# server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-            # Also save username and username header
-            clients[client_socket] = user
+# # Bind, so server informs operating system that it's going to use given IP and port
+# # For a server using 0.0.0.0 means to listen on all available interfaces, useful to connect locally to 127.0.0.1 and remotely to LAN interface IP
+# server_socket.bind((IP, PORT))
 
-            print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['data'].decode('utf-8')))
+# # This makes server listen to new connections
+# server_socket.listen()
 
-        # Else existing socket is sending a message
-        else:
+# # List of sockets for select.select()
+# sockets_list = [server_socket]
 
-            # Receive message
-            message = receive_message(notified_socket)
+# # List of connected clients - socket as a key, user header and name as data
+# clients = {}
 
-            # If False, client disconnected, cleanup
-            if message is False:
-                print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+# print(f'Listening for connections on {IP}:{PORT}...')
 
-                # Remove from list for socket.socket()
-                sockets_list.remove(notified_socket)
+# # Handles message receiving
+# def receive_message(client_socket):
 
-                # Remove from our list of users
-                del clients[notified_socket]
+#     try:
 
-                continue
+#         # Receive our "header" containing message length, it's size is defined and constant
+#         message_header = client_socket.recv(HEADER_LENGTH)
 
-            # Get user by notified socket, so we will know who sent the message
-            user = clients[notified_socket]
+#         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
+#         if not len(message_header):
+#             return False
 
-            print(f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+#         # Convert header to int value
+#         message_length = int(message_header.decode('utf-8').strip())
 
-            # Iterate over connected clients and broadcast message
-            for client_socket in clients:
+#         # Return an object of message header and message data
+#         return {'header': message_header, 'data': client_socket.recv(message_length)}
 
-                # But don't sent it to sender
-                if client_socket != notified_socket:
+#     except:
 
-                    # Send user and message (both with their headers)
-                    # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                    client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+#         # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
+#         # or just lost his connection
+#         # socket.close() also invokes socket.shutdown(socket.SHUT_RDWR) what sends information about closing the socket (shutdown read/write)
+#         # and that's also a cause when we receive an empty message
+#         return False
 
-    # It's not really necessary to have this, but will handle some socket exceptions just in case
-    for notified_socket in exception_sockets:
+# while True:
 
-        # Remove from list for socket.socket()
-        sockets_list.remove(notified_socket)
+#     # Calls Unix select() system call or Windows select() WinSock call with three parameters:
+#     #   - rlist - sockets to be monitored for incoming data
+#     #   - wlist - sockets for data to be send to (checks if for example buffers are not full and socket is ready to send some data)
+#     #   - xlist - sockets to be monitored for exceptions (we want to monitor all sockets for errors, so we can use rlist)
+#     # Returns lists:
+#     #   - reading - sockets we received some data on (that way we don't have to check sockets manually)
+#     #   - writing - sockets ready for data to be send thru them
+#     #   - errors  - sockets with some exceptions
+#     # This is a blocking call, code execution will "wait" here and "get" notified in case any action should be taken
+#     read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
 
-        # Remove from our list of users
-        del clients[notified_socket]
+
+#     # Iterate over notified sockets
+#     for notified_socket in read_sockets:
+
+#         # If notified socket is a server socket - new connection, accept it
+#         if notified_socket == server_socket:
+
+#             # Accept new connection
+#             # That gives us new socket - client socket, connected to this given client only, it's unique for that client
+#             # The other returned object is ip/port set
+#             client_socket, client_address = server_socket.accept()
+
+#             # Client should send his name right away, receive it
+#             user = receive_message(client_socket)
+
+#             # If False - client disconnected before he sent his name
+#             if user is False:
+#                 continue
+
+#             # Add accepted socket to select.select() list
+#             sockets_list.append(client_socket)
+
+#             # Also save username and username header
+#             clients[client_socket] = user
+
+#             print('Accepted new connection from {}:{}, username: {}'.format(*client_address, user['data'].decode('utf-8')))
+
+#             client_socket.send("public_key=" + public_key.exportKey() + "\n")
+#             print("Public key sent to client.")
+
+#         # Else existing socket is sending a message
+#         else:
+
+#             # Receive message
+#             message = receive_message(notified_socket)
+
+#             # If False, client disconnected, cleanup
+#             if message is False:
+#                 print('Closed connection from: {}'.format(clients[notified_socket]['data'].decode('utf-8')))
+
+#                 # Remove from list for socket.socket()
+#                 sockets_list.remove(notified_socket)
+
+#                 # Remove from our list of users
+#                 del clients[notified_socket]
+
+#                 continue
+
+#             # Get user by notified socket, so we will know who sent the message
+#             user = clients[notified_socket]
+
+#             print(f'Received message from {user["data"].decode("utf-8")}: {message["data"].decode("utf-8")}')
+
+#             # Iterate over connected clients and broadcast message
+#             for client_socket in clients:
+
+#                 # But don't sent it to sender
+#                 if client_socket != notified_socket:
+
+#                     # Send user and message (both with their headers)
+#                     # We are reusing here message header sent by sender, and saved username header send by user when he connected
+#                     client_socket.send(user['header'] + user['data'] + message['header'] + message['data'])
+
+#     # It's not really necessary to have this, but will handle some socket exceptions just in case
+#     for notified_socket in exception_sockets:
+
+#         # Remove from list for socket.socket()
+#         sockets_list.remove(notified_socket)
+
+#         # Remove from our list of users
+#         del clients[notified_socket]
