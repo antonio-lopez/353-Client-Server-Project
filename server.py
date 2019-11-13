@@ -11,7 +11,8 @@ public_key = private_key.publickey()
 
 #Declartion
 mysocket = socket.socket()
-host = socket.gethostbyname(socket.getfqdn())
+#host = socket.gethostbyname(socket.getfqdn())
+host = "10.67.11.201"
 port = 7777
 encrypt_str = "encrypted_message="  # used to detect start of encrypted message
 client_response = "Client: OK".encode() # convert string to bytes
@@ -35,24 +36,24 @@ while True:
     # comparisons are made between bytes in the if-statements
     if data == client_response:
         c.send(public_key.exportKey())
-        print("OK received from client")
-        print("Public key sent to client\n")
+        print("3)OK received from client")
+        print("4)Public key sent to client\n")
         print(public_key.exportKey())
 
     elif encrypt_str.encode() in data:  # if encrypt_str "header" is detected 
         data = data.replace(encrypt_str.encode(), ''.encode())  # remove "header"
-        print("\nReceived Encrypted message = ", data)
+        print("\n7)Received Encrypted message = ", data)
         decryptor = PKCS1_OAEP.new(private_key)
         decrypted = decryptor.decrypt(ast.literal_eval(str(data)))  # decrypt message
         c.send("Server: OK".encode())
-        print("\nDecrypting message...")
-        print("Decrypted message = ", decrypted)    # print decrypted message
-        print("Sending OK to client")
+        print("\n8)Decrypting message...")
+        print("9)Decrypted message = ", decrypted)    # print decrypted message
+        print("10)Sending OK to client")
 
     elif data == "Quit".encode(): 
         break
 
 #Server to stop
-c.send("Server stopped".encode())
-print("Server stopped")
+c.send("13)Server stopped".encode())
+print("13)Server stopped")
 c.close()
