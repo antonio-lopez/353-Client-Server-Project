@@ -18,11 +18,6 @@ print("2)Sending OK to server...\n")
 server_string = server.recv(1024)
 print("5)Recieved public key from server: ", server_string, "\n")
 
-#Remove extra characters
-#server_string = server_string.replace("public_key=".encode(), ''.encode())
-#server_string = server_string.replace("\r\n".encode(), ''.encode())
-#print("New Recieved public key: ", server_string)
-
 #Convert string to key
 server_public_key = RSA.importKey(server_string)
 encryptor = PKCS1_OAEP.new(server_public_key)
